@@ -142,8 +142,6 @@ class CivicrmGroupRoles {
     $select = $this->getDatabase()
       ->select('civicrm_uf_match', 'uf')
       ->fields('uf', ['contact_id']);
-    $select->leftJoin('civicrm_group_contact', 'gc', 'uf.contact_id = gc.contact_id');
-    $select->isNotNull('gc.id')->condition('gc.group_id', $groups, 'IN');
 
     if ($limit) {
       $select->range(0, $limit)->orderRandom();
@@ -248,6 +246,17 @@ class CivicrmGroupRoles {
   }
 
   /**
+   * Return if debugging is enabled in settings.
+   */
+  protected function isDebuggingEnabled() {
+    $config = \Drupal::config('civicrm_group_roles.settings');
+    if (empty($config->get('debugging'))) {
+      return FALSE;
+    }
+    return TRUE;
+  }
+
+  /**
    * Syncs the role for the user related to a contact.
    *
    * @param int $cid
@@ -256,18 +265,38 @@ class CivicrmGroupRoles {
    *   The user account.
    */
   public function syncContact($cid, AccountInterface $account) {
-    $rules = $this->getRules();
-    $groups = $this->getContactGroups($cid);
-
     // The inital set of roles assigned to the user.
     $userRoles = $account->getRoles();
+    $rules = $this->getRules();
+    $rulesMapping = $this->getRulesMapping($rules);
+    foreach ($rulesMapping as $rule) {
+      $contacts = civicrm_api3('Contact', 'get', [
+        'sequential' => 1,
+        'id' => $cid,
+        'group' => $rule['group'],
+      ]);
+      if ($contacts['count'] > 0) {
+        if ($this->isDebuggingEnabled) {
+          $msg = 'Role @role should be held by user @user (@uid) because they are part of group @group (contactID: @cid).';
+          $params = [
+            '@role' => $rule['role'],
+            '@user' => $account->get('name')->value,
+            '@uid' => $account->get('uid')->value,
+            '@group' => $rule['group'],
+            '@cid' => $cid,
+          ];
+          \Drupal::logger('civicrm_group_roles')->info($msg, $params);
+        }
+        $contactGroups[] = $rule['group'];
+      }
+    }
 
-    if (empty($groups)) {
+    if (empty($contactGroups)) {
       // Remove the roles managed by CiviCRM groups.
-      $newRoles = array_diff($userRoles, $this->getRulesRoles($rules));
+      $newRoles = array_diff($userRoles, array_column($rulesMapping, 'role'));
     }
     else {
-      $newRoles = array_unique(array_merge($userRoles, $this->getAddRoles($rules, $groups)));
+      $newRoles = array_unique(array_merge($userRoles, $this->getAddRoles($rules, $contactGroups)));
     }
 
     // If changes to the user roles were made, save it.
@@ -279,20 +308,22 @@ class CivicrmGroupRoles {
   }
 
   /**
-   * Finds roles used in a set of assignment rules.
+   * Returns a mapping of role => group rules.
    *
    * @param \Drupal\civicrm_group_roles\Entity\CivicrmGroupRoleRuleInterface[] $rules
    *   Assignment rules.
    *
    * @return array
-   *   The roles found in the assignment rules.
    */
-  protected function getRulesRoles(array $rules) {
-    $roles = [];
+  protected function getRulesMapping(array $rules) {
+    $ruleMapping = [];
     foreach ($rules as $rule) {
-      $roles[] = $rule->getRole();
+      $ruleMapping[] = [
+        'role' => $rule->getRole(),
+        'group' => $rule->getGroup()
+      ];
     }
-    return array_unique($roles);
+    return $ruleMapping;
   }
 
   /**
@@ -364,7 +395,6 @@ class CivicrmGroupRoles {
  * @return array
  */
 function validateGroups(array $groups) {
-  $config = \Drupal::config('civicrm_group_roles.settings');
   foreach ($groups as $key => $groupId) {
     $group_result = civicrm_api3('Group', 'get', array(
       'group_id' => $groupId,
@@ -382,7 +412,7 @@ function validateGroups(array $groups) {
 
     // CRM-11161: Exclude smart groups as we don't want to add contacts statically to a smart group
     if (!empty($group_result['values'][0]['saved_search_id'])) {
-      if (!empty($config->get('debugging'))) {
+      if ($this->isDebuggingEnabled) {
         $msg = 'Group ID @groupId is a smart group, so the user was not added to it statically.';
         $variables = ['@groupId' => $groupId];
         \Drupal::logger('civicrm_group_roles')->info($msg, $variables);
@@ -425,12 +455,11 @@ function validateGroups(array $groups) {
    */
   protected function getAddRoles(array $rules, array $groups) {
     $roles = [];
-
-    foreach ($groups as $group) {
+    foreach ($groups as $groupId) {
       // Find rules applicable to the group type.
-      $groupRules = array_filter($rules, function ($rule) use ($group) {
+      $groupRules = array_filter($rules, function ($rule) use ($groupId) {
         /* @var \Drupal\civicrm_group_roles\Entity\CivicrmGroupRoleRuleInterface */
-        return $rule->getGroup() == $group['group_id'];
+        return $rule->getGroup() == $groupId;
       });
       foreach ($groupRules as $rule) {
         $roles[] = $rule->getRole();
