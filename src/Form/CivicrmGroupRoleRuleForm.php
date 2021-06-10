@@ -5,6 +5,7 @@ namespace Drupal\civicrm_group_roles\Form;
 use Drupal\civicrm_group_roles\CivicrmGroupRoles;
 use Drupal\Core\Entity\EntityForm;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Messenger\MessengerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -20,13 +21,22 @@ class CivicrmGroupRoleRuleForm extends EntityForm {
   protected $groupRoles;
 
   /**
+   * @var \Drupal\Core\Messenger\MessengerInterface $messenger
+   */
+  protected $messenger;
+
+  /**
    * CivicrmGroupRoleRuleForm constructor.
    *
    * @param \Drupal\civicrm_group_roles\CivicrmGroupRoles $groupRoles
    *   CiviCRM group roles service.
    */
-  public function __construct(CivicrmGroupRoles $groupRoles) {
+  public function __construct(
+    CivicrmGroupRoles $groupRoles,
+    MessengerInterface $messenger
+  ) {
     $this->groupRoles = $groupRoles;
+    $this->messenger = $messenger;
   }
 
   /**
@@ -111,13 +121,13 @@ class CivicrmGroupRoleRuleForm extends EntityForm {
 
     switch ($status) {
       case SAVED_NEW:
-        drupal_set_message($this->t('Created the %label rule.', [
+        $this->messenger->addMessage($this->t('Created the %label rule.', [
           '%label' => $rule->label(),
         ]));
         break;
 
       default:
-        drupal_set_message($this->t('Saved the %label rule.', [
+        $this->messenger->addMessage($this->t('Saved the %label rule.', [
           '%label' => $rule->label(),
         ]));
     }
