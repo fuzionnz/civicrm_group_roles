@@ -43,7 +43,10 @@ class CivicrmGroupRoleRuleForm extends EntityForm {
    * {@inheritdoc}
    */
   public static function create(ContainerInterface $container) {
-    return new static($container->get('civicrm_group_roles'));
+    return new static(
+      $container->get('civicrm_group_roles'),
+      $container->get('messenger')
+    );
   }
 
   /**
