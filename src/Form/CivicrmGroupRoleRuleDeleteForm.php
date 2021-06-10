@@ -4,12 +4,22 @@ namespace Drupal\civicrm_group_roles\Form;
 
 use Drupal\Core\Entity\EntityConfirmFormBase;
 use Drupal\Core\Form\FormStateInterface;
+use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Url;
 
 /**
  * Builds the form to delete Civicrm group role rule entities.
  */
 class CivicrmGroupRoleRuleDeleteForm extends EntityConfirmFormBase {
+
+  /**
+   * @var \Drupal\Core\Messenger\MessengerInterface $messenger
+   */
+  protected $messenger;
+
+  public function __construct(MessengerInterface $messenger) {
+    $this->messenger = $messenger;
+  }
 
   /**
    * {@inheritdoc}
@@ -38,7 +48,7 @@ class CivicrmGroupRoleRuleDeleteForm extends EntityConfirmFormBase {
   public function submitForm(array &$form, FormStateInterface $form_state) {
     $this->entity->delete();
 
-    drupal_set_message(
+    $this->messenger->addMessage(
       $this->t('Deleted association rule @label.',
         [
           '@label' => $this->entity->label(),
