@@ -2,6 +2,7 @@
 
 namespace Drupal\civicrm_group_roles\Batch;
 
+use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\StringTranslation\StringTranslationTrait;
 use Drupal\Core\StringTranslation\TranslationInterface;
 
@@ -13,13 +14,22 @@ class Sync {
   use StringTranslationTrait;
 
   /**
+   * @var \Drupal\Core\Messenger\MessengerInterface $messenger
+   */
+  protected $messenger;
+
+  /**
    * Sync constructor.
    *
    * @param \Drupal\Core\StringTranslation\TranslationInterface $stringTranslation
    *   The string translation service.
    */
-  public function __construct(TranslationInterface $stringTranslation) {
+  public function __construct(
+    TranslationInterface $stringTranslation,
+    MessengerInterface $messenger
+  ) {
     $this->stringTranslation = $stringTranslation;
+    $this->messenger = $messenger;
   }
 
   /**
@@ -80,11 +90,11 @@ class Sync {
   public function finished($success, array $results) {
     if ($success) {
       $message = $this->stringTranslation->formatPlural($results['processed'], 'One user processed.', '@count users processed.');
-      drupal_set_message($message);
+      $this->messenger->addMessage($message);
     }
     else {
       $message = $this->t('Encountered errors while performing sync.');
-      drupal_set_message($message, 'error');
+      $this->messenger->addMessage($message, 'error');
     }
 
   }
