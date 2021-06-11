@@ -1,4 +1,7 @@
-Provides two-way synchronization between Drupal Roles and CiviCRM based on rules defined by the administrator.
+This repo is archived. 
 
-![Screenshot](/images/group_role_sync.jpg)
+Drupal Module - https://www.drupal.org/project/civicrm_group_roles
 
+Raise an issue on the drupal issue queue - https://www.drupal.org/node/add/project-issue/civicrm_group_roles
+
+Submit new changes/PR on the repo - https://git.drupalcode.org/project/civicrm_group_roles
